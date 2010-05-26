@@ -45,17 +45,20 @@ _nix_env ()
 }
 
 __nix_env_install () {
+    local cur="${COMP_WORDS[COMP_CWORD]}"
     local v="$__NIX_INSTALL_UPDATE_COMMON --preserve-installed -P"
     COMPREPLY=( $(compgen -W "${v}" -- ${cur}) )
 }
 
 __nix_env_upgrade () {
+    local cur="${COMP_WORDS[COMP_CWORD]}"
     local v="$__NIX_INSTALL_UPDATE_COMMON --lt --leq --eq  --always"
     COMPREPLY=( $(compgen -W "${v}" -- ${cur}) )
 }
 
 __nix_env_uninstall () {
-    local search=$(nix-env -q --installed '*' 2>/dev/null | grep "$cur")
+    local cur="${COMP_WORDS[COMP_CWORD]}"
+    local search=$(nix-env -q --installed '*'  | grep "${cur}" 2>/dev/null)
     COMPREPLY=( $(compgen -W "${search}" -- ${cur}) )
 }
 
@@ -72,7 +75,7 @@ __nix_env_query () {
         local l=$(( ${#COMP_WORDS[@]} - 2))
         # remove head and tail from COMP_WORDS
         local args=${COMP_WORDS[@]:1:$l}
-        local search=$(nix-env $args '*' 2>/dev/null | grep "$cur")
+        local search=$(nix-env $args '*' | grep "$cur"  2>/dev/null)
         COMPREPLY=( $(compgen -W "${search}" -- ${cur}) )
     fi
 }
@@ -292,3 +295,4 @@ complete -o default -F _nix_hash nix-hash
 complete -o default -F _nix_install_package nix-install-package
 complete -F _nix_push nix-push
 complete -F _nix_worker nix-worker
+

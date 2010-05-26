@@ -1,0 +1,15 @@
+# Nix Completions
+
+Bash completions for nix commands, just source the script in your bashrc. 
+
+Try:
+
+    nix-env -qa MPlayer<tab>
+
+Or:
+    
+    nix-env -e <tab><tab>
+
+#TODO
+
+* finish writing nix-instantiate, nix-build, nix-store
