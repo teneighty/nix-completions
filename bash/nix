@@ -1,0 +1,294 @@
+#!bash
+
+__NIX_INSTALL_UPDATE_COMMON="
+    --prebuilt-only -b --attr -A --from-expression -E --from-profile 
+"
+__NIX_ENV_COMMON="
+    --file -f --profile -p --dry-run --system-filter
+"
+
+__NIX_STORE_COMMON="
+       --help --version --verbose -v --no-build-output -Q --max-jobs -j --max-silent-time
+       --keep-going -k --keep-failed -K --fallback --readonly-mode --log-type  --show-trace
+       --arg  --argstr  --attr -A "
+
+_nix_env () 
+{
+    local cur prev opts
+    cur="${COMP_WORDS[COMP_CWORD]}"
+    prev="${COMP_WORDS[COMP_CWORD-1]}"
+    opts="--install -i
+          --upgrade -u
+          --uninstall -e
+          --set-flag
+          --query -q
+          --switch-profile -S
+          --list-generations --delete-generations
+          --switch-generation --rollback"
+
+    __nix_find_op "${opts}"
+
+    # deidcated variable __NIX_ENV_OP
+    case "${__NIX_ENV_OP}" in
+    -i|--install)         __nix_env_install            ;; 
+    -u|--upgrade)         __nix_env_upgrade            ;; 
+    -e|--uninstall)       __nix_env_uninstall          ;; 
+    -q|--query)           __nix_env_query              ;; 
+    --delete-generations) __nix_env_delete_switch_gens ;; 
+    --switch-generation)  __nix_env_delete_switch_gens ;; 
+    *)
+        COMPREPLY=( $(compgen -W "${opts} ${__NIX_ENV_COMMON}" -- ${cur}) )
+        ;;
+    esac
+
+    unset __NIX_ENV_OP
+}
+
+__nix_env_install () {
+    local v="$__NIX_INSTALL_UPDATE_COMMON --preserve-installed -P"
+    COMPREPLY=( $(compgen -W "${v}" -- ${cur}) )
+}
+
+__nix_env_upgrade () {
+    local v="$__NIX_INSTALL_UPDATE_COMMON --lt --leq --eq  --always"
+    COMPREPLY=( $(compgen -W "${v}" -- ${cur}) )
+}
+
+__nix_env_uninstall () {
+    local search=$(nix-env -q --installed '*' 2>/dev/null | grep "$cur")
+    COMPREPLY=( $(compgen -W "${search}" -- ${cur}) )
+}
+
+# Note: the package completion won't scale well
+__nix_env_query () {
+    local cur="${COMP_WORDS[COMP_CWORD]}"
+    if [[ "${cur}" = -* ]]; then
+        local v="--installed --available -a --status -s --attr-path -P
+                 --no-name --compare-versions -c --system --drv-path
+                 --out-path --description --meta --xml
+                 --prebuilt-only -b --attr -A "
+        COMPREPLY=( $(compgen -W "${v}" -- ${cur}) )
+    else
+        local l=$(( ${#COMP_WORDS[@]} - 2))
+        # remove head and tail from COMP_WORDS
+        local args=${COMP_WORDS[@]:1:$l}
+        local search=$(nix-env $args '*' 2>/dev/null | grep "$cur")
+        COMPREPLY=( $(compgen -W "${search}" -- ${cur}) )
+    fi
+}
+
+__nix_env_delete_switch_gens () {
+    local gens=$(nix-env --list-generations | awk '{print $1}')
+    COMPREPLY=( $(compgen -W "${gens}" -- ${cur} ) )
+}
+
+_nix_store () 
+{
+    local cur prev opts
+    cur="${COMP_WORDS[COMP_CWORD]}"
+    prev="${COMP_WORDS[COMP_CWORD-1]}"
+    opts="--realise -r
+          --gc
+          --delete
+          --query -q
+          --verify
+          --dump
+          --restore
+          --export
+          --import
+          --optimise
+          --read-log -l
+          --dump-db
+          --load-db
+          "
+
+    __nix_find_op "${opts}"
+    case "${__NIX_ENV_OP}" in
+    --realise|-r)  __nix_store_realise ;; 
+    --gc)          __nix_store_gc      ;; 
+    --delete)      __nix_store_delete  ;; 
+    --query|-q)    __nix_store_query   ;; 
+    --verify)      __nix_store_verify  ;; 
+    *)
+        COMPREPLY=( $(compgen -W "${opts} ${__NIX_STORE_COMMON}" -- ${cur}) ) ;;
+    esac
+
+    unset __NIX_ENV_OP
+}
+
+__nix_store_realise () {
+    local cur="${COMP_WORDS[COMP_CWORD]}"
+    if [[ ${cur} == -* ]]; then
+        COMPREPLY=( $(compgen -W "--dry-run" -- ${cur}) )
+    fi
+}
+
+__nix_store_gc () {
+    local cur="${COMP_WORDS[COMP_CWORD]}"
+    local prev="${COMP_WORDS[COMP_CWORD - 1]}"
+    case "${prev}" in
+    --max-freed) ;;
+    --max-links) ;;
+    *)
+        local v="--print-roots --print-live --print-dead
+                 --delete --max-freed --max-links"
+        COMPREPLY=( $(compgen -W "${v}" -- ${cur}) ) ;;
+    esac
+}
+
+__nix_store_delete () {
+    local cur="${COMP_WORDS[COMP_CWORD]}"
+    if [[ ${cur} == -* ]]; then
+        COMPREPLY=( $(compgen -W "--ignore-liveness" -- ${cur}) )
+    fi
+}
+
+__nix_store_query () {
+    local cur="${COMP_WORDS[COMP_CWORD]}"
+    local prev="${COMP_WORDS[COMP_CWORD - 1]}"
+    if [[ "${cur}" = -* ]]; then
+        case "${prev}" in
+        --binding) ;;
+        *)
+            local v="--outputs --requisites -R --references --referrers
+                    --referrers-closure --deriver --deriver --graph
+                    --tree --binding --hash --roots --use-output -u
+                    --force-realise -f"
+            COMPREPLY=( $(compgen -W "${v}" -- ${cur}) ) ;;
+        esac
+    fi
+}
+
+__nix_store_verify () {
+    local cur="${COMP_WORDS[COMP_CWORD]}"
+    if [[ ${cur} == -* ]]; then
+        COMPREPLY=( $(compgen -W "--check-contents" -- ${cur}) )
+    fi
+}
+
+_nix_instantiate () 
+{
+    local cur="${COMP_WORDS[COMP_CWORD]}"
+
+    _nix_store
+    if [[ ${cur} == -* ]] ; then
+        COMPREPLY=( ${COMPREPLY[@]} $(compgen -W "${__nix_common}" -- ${cur}) )
+    fi
+}
+
+_nix_build () 
+{
+    local cur="${COMP_WORDS[COMP_CWORD]}"
+    local opts="--add-drv-link --drv-link --no-out-link --out-link -o"
+
+    _nix_instantiate
+    if [[ ${cur} == -* ]] ; then
+        COMPREPLY=( ${COMPREPLY[@]} $(compgen -W "${__nix_common}" -- ${cur}) )
+    fi
+}
+
+
+# TODO; this is ugly. rewrite please.
+__nix_find_op () {
+    opts="$1"
+    for v in ${COMP_WORDS[@]:1}; do
+        # long ops
+        if [[ ${v} = --* ]]; then
+            for o in $opts; do
+                if [ "$v" = "$o" ]; then
+                    __NIX_ENV_OP=$v
+                    return
+                fi
+            done
+        else
+            # short opts
+            local i=1
+            while [ "$i" -le "${#v}" ]
+            do
+                local c=$(expr substr "${v}" $i 1)
+                for o in $opts; do
+                    if [ "-$c" = "$o" ]; then
+                        __NIX_ENV_OP="-$c"
+                        return
+                    fi
+                done
+                i=$(( i + 1 ))
+             done
+        fi
+    done
+}
+
+_nix_channel () 
+{
+    local cur="${COMP_WORDS[COMP_CWORD]}"
+    local opts="--add --remove --list --update"
+
+    if [[ ${cur} == -* ]] ; then
+        COMPREPLY=( $(compgen -W "${opts}" -- ${cur}) )
+        return 0
+    fi
+}
+
+_nix_collect_garbage () 
+{
+    local cur="${COMP_WORDS[COMP_CWORD]}"
+    local opts="--delete-old -d --print-roots --print-live --print-dead --delete"
+
+    if [[ ${cur} == -* ]] ; then
+        COMPREPLY=( $(compgen -W "${opts}" -- ${cur}) )
+        return 0
+    fi
+}
+
+_nix_hash () 
+{
+    local cur="${COMP_WORDS[COMP_CWORD]}"
+    local prev="${COMP_WORDS[COMP_CWORD-1]}"
+
+    case $prev in
+        --type)
+            COMPREPLY=( $(compgen -W "md5 sha1 sha256" -- ${cur}) )
+            return 0
+            ;;
+    esac
+
+    if [[ "${cur}" = -* ]]; then
+        COMPREPLY=( $(compgen -W "--flat --base32 --truncate --type
+                                  --to-base16 --to-base32" -- ${cur}) )
+    fi
+}
+
+_nix_install_package () 
+{
+    local cur="${COMP_WORDS[COMP_CWORD]}"
+
+    if [[ "${cur}" = -* ]]; then
+        COMPREPLY=( $(compgen -W "--non-interactive 
+                                  --profile -p --url" -- ${cur}) )
+    fi
+}
+
+_nix_push () 
+{
+    local cur="${COMP_WORDS[COMP_CWORD]}"
+    if [[ "${cur}" = -* ]]; then
+        COMPREPLY=( $(compgen -W "--copy" -- ${cur}) )
+    fi
+}
+
+_nix_worker () 
+{
+    local cur="${COMP_WORDS[COMP_CWORD]}"
+    COMPREPLY=( $(compgen -W "--daemon" -- ${cur}) )
+}
+
+complete -o default -F _nix_env nix-env 
+complete -o default -F _nix_store nix-store 
+complete -o default -F _nix_instantiate nix-instantiate 
+complete -o default -F _nix_build nix-build 
+complete -F _nix_channel nix-channel 
+complete -F _nix_collect_garbage nix-collect-garbage 
+complete -o default -F _nix_hash nix-hash
+complete -o default -F _nix_install_package nix-install-package
+complete -F _nix_push nix-push
+complete -F _nix_worker nix-worker
